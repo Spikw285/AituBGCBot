@@ -56,8 +56,8 @@ async def on_need_chosen(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(need_type=need_type, game_id=None, game_title=None)
     await callback.message.edit_reply_markup(reply_markup=None)
 
-    if need_type == NEED_RECOMMEND:
-        # Если нужна рекомендация, берём игры с БД
+    if need_type == NEED_RULES:
+        # Если нужно объяснить игру, берём игры с БД
         # TODO: заменить на запрос к БД
         mock_games = [
             {"id": 1, "title": "Catan"},
