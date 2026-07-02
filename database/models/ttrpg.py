@@ -1,182 +1,90 @@
-"""
-Модели для НРИ систем
-Owner: Spikw285
-
-TTRPGSystem     - справочник систем
-DMProfile       - профиль ДМа
-DMProfileSystem - какие системы водит ДМ (many-to-many)
-Campaign        - тип сессии (Кампания или ваншот)
-Session         - конкретная сессия в рамках кампании
-TTRPGSignup     - заявка участника на кампанию
-"""
+from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 
 from database.base import Base
 
 
-class CampaignType(PyEnum):
+class SessionType(PyEnum):
     CAMPAIGN = "campaign"
-    ONESHOT  = "oneshot"
+    ONESHOT = "oneshot"
 
-class CampaignStatus(PyEnum):
-    RECRUITING  = "recruiting"
-    IN_PROGRESS = "in_progress"
-    COMPLETED   = "completed"
-    CANCELLED   = "cancelled"
 
 class SignupStatus(PyEnum):
-    PENDING   = "pending"
-    CONFIRMED = "confirmed"
-    REJECTED  = "rejected"
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
 
-class TTRPGSystem(Base):
-    """
-    Справочник НРИ систем. Каждое издание - отдельная запись.
-
-    Наполняется через seed.py
-    """
-    __tablename__ = "ttrpg_systems"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    short_name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    full_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    description: Mapped[str | None] = mapped_column(String(256), nullable=True)
-
-class DMProfile(Base):
-    """
-    Профиль ДМа.
-    Один участник может иметь только один ДМ профиль (unique member_id)
-    """
-    __tablename__ = "dm_profiles"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    # TODO: раскомментировать после реализации member.py
-    member_id: Mapped[int] = mapped_column(
-        # ForeignKey("members.id"),
-        Integer,
-        nullable=False,
-        unique=True,
-        comment="FK -> members.id, unique",
-    )
-
-    experience: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_accepting: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-    # Связь many-to-many через DMProfileSystem
-    systems: Mapped[list["DMProfileSystem"]] = relationship(back_populates="dm_profiles")
-    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="dm")
-
-    # TODO: раскомментировать после member.py
-    # member = relationship("Member", foreign_keys=[member_id])
-
-class DMProfileSystem(Base):
-    """
-    Связка ДМ-профиля с системами которы он водит.
-
-    Составной первичный ключ - пара (dm_profile_id, system_id) должна быть уникальной
-    """
-    __tablename__ = "dm_profile_systems"
-
-    dm_profile_id: Mapped[int] = mapped_column(
-        ForeignKey("dm_profiles.id"), primary_key=True
-    )
-    system_id: Mapped[int] = mapped_column(
-        ForeignKey("ttrpg_systems.id"), primary_key=True
-    )
-
-    dm_profile: Mapped["DMProfile"] = relationship(back_populates="systems")
-    system: Mapped["TTRPGSystem"] = relationship()
 
 class Campaign(Base):
-    """Кампания или ваншот, который ведёт ДМ"""
     __tablename__ = "campaigns"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    dm_id: Mapped[int] = mapped_column(ForeignKey("dm_profiles.id"), nullable=False)
-
-    title: Mapped[str] = mapped_column(String(128), nullable=False)
-    system_id: Mapped[int] = mapped_column(ForeignKey("ttrpg_systems.id"), nullable=False)
-
-    type:  Mapped[CampaignType] = mapped_column(
-        SQLEnum(CampaignType, name="campaign_type"), nullable=False
-    )
-
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    system: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    max_players: Mapped[int] = mapped_column(Integer, nullable=False)
-    requirements: Mapped[str | None] = mapped_column(
-        Text, nullable=True, comment="Опыт игроков, возрастные ограничения и т.п."
-    )
-
-    status: Mapped[CampaignStatus] = mapped_column(
-        SQLEnum(CampaignStatus, name="campaign_status"),
-        default=CampaignStatus.RECRUITING,
-        nullable=False,
-    )
-
+    dm_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
-    dm: Mapped["DMProfile"] = relationship(back_populates="campaigns")
-    system: Mapped["TTRPGSystem"] = relationship()
-    sessions: Mapped[list["Session"]] = relationship(back_populates="campaign")
-    signups: Mapped[list["TTRPGSignup"]] = relationship(back_populates="campaign")
+    dm = relationship("Member", back_populates="led_campaigns")
+    sessions = relationship("Session", back_populates="campaign", cascade="all, delete-orphan")
+
 
 class Session(Base):
-    """Конкретная сессия в рамках кампании"""
-    __tablename__ = "sessions"
+    __tablename__ = "ttrpg_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    system: Mapped[str] = mapped_column(String(128), nullable=False)
+    session_type: Mapped[SessionType] = mapped_column(
+        Enum(SessionType, name="session_type"),
+        default=SessionType.ONESHOT,
+        nullable=False,
+    )
+    dm_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    max_players: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_open: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
-    session_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    duration_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
-    location: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    campaign = relationship("Campaign", back_populates="sessions")
+    dm = relationship("Member", back_populates="dm_sessions")
+    signups = relationship("TTRPGSignup", back_populates="session", cascade="all, delete-orphan")
 
-    campaign: Mapped["Campaign"] = relationship(back_populates="sessions")
 
 class TTRPGSignup(Base):
-    """Заявка участника на кампанию или ваншот"""
     __tablename__ = "ttrpg_signups"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), nullable=False)
-
-    # TODO: раскомментировать после имплементации member.py
-    member_id: Mapped[int] = mapped_column(
-        # ForeignKey("members.id"),
-        Integer,
-        nullable=False,
-        comment="FK -> members.id",
-    )
-
+    session_id: Mapped[int] = mapped_column(ForeignKey("ttrpg_sessions.id"), nullable=False)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-
     status: Mapped[SignupStatus] = mapped_column(
-        SQLEnum(SignupStatus, name="signup_status"),
+        Enum(SignupStatus, name="signup_status"),
         default=SignupStatus.PENDING,
         nullable=False,
     )
-
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
-    campaign: Mapped["Campaign"] = relationship(back_populates="signups")
-    # TODO: раскомментировать после имплементации member.py
-    # member = relationship("Member", foreign_keys=[member_id])
+    session = relationship("Session", back_populates="signups")
+    member = relationship("Member", back_populates="ttrpg_signups")

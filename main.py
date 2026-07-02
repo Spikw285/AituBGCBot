@@ -6,6 +6,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import settings
 from database.base import engine
 from database.middleware import DatabaseMiddleware
+from database import models as _models  # noqa: F401
+from handlers.common import router as core_router
 from handlers.requests import router as requests_router
 
 from logger import setup_logging, logging
@@ -20,6 +22,7 @@ async def main() -> None:
     dp = Dispatcher(storage=MemoryStorage())
 
     dp.update.middleware(DatabaseMiddleware())
+    dp.include_router(core_router)
     dp.include_router(requests_router)
 
     try:

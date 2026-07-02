@@ -14,9 +14,7 @@ dependencies = [
     "python-json-logger==2.0.7"
 ]
 
-[
-tool.alembic
-]
+[tool.alembic]
 script_location = "migrations"
 
 [project.optional-dependencies]

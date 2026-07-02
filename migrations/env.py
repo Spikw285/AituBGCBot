@@ -10,21 +10,7 @@ from config import settings
 from database.base import Base
 
 # импорт моделей
-# TODO: реализовать реальные импорты с реализациями
-
-# from database.models.member import Member, MemberRole, TrustLevelRef
-# IMPORTANT: при изменении имени модели строго прописать как оно называется, как реализовано
-
-# from database.models.game import Game, GameCopy
-# from database.models.borrow_log import BorrowLog
-# IMPORTANT: при изменении имени модели строго прописать как оно называется, как реализовано
-
-from database.models.request import GameRequest, GMRequest
-from database.models.ttrpg import (
-    DMProfile, DMProfileSystem, TTRPGSystem,
-    Campaign, Session, TTRPGSignup,
-)
-# IMPORTANT: при изменении имени модели строго прописать как оно называется, как реализовано
+from database import models  # noqa: F401
 
 # стандартная настройка Alembic
 
